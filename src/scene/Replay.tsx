@@ -15,6 +15,8 @@ export interface ReplayProps {
   round: RoundRecord | null
   reducedMotion: boolean
   onFinish: () => void
+  /** გოლის მომენტი — სტადიონი პროჟექტორის პულსით პასუხობს */
+  onGoalImpact?: (at: number) => void
 }
 
 interface Frame {
@@ -35,6 +37,8 @@ const IDLE: Frame = {
   postFlash: null,
 }
 
+/** შერბენის ხანგრძლივობა დარტყმამდე — ბურთი ამ დროს ადგილზეა */
+const KICK_AT = 0.62
 /** დივის გაშლის ხანგრძლივობა */
 const DIVE_TIME = 0.3
 /** შეხების შემდეგ რამდენ ხანს ვაჩერებთ კადრს */
@@ -45,10 +49,11 @@ const REDUCED_HOLD = 0.3
 /**
  * გათამაშება — უკვე გამოთვლილი შედეგის დეტერმინისტული ანიმაცია.
  *
- * აქ არაფერი წყდება: `round.resolution` მზად არის, ეს კომპონენტი მხოლოდ
- * კითხულობს (§4). ანიმაციის დასრულებაზე ის მხოლოდ ატყობინებს store-ს.
+ * დროის ხაზი: [0, KICK_AT) შერბენა → KICK_AT დარტყმა → ბურთის ფრენა →
+ * შეხება → დაშოშმინება. აქ არაფერი წყდება: `round.resolution` მზად არის,
+ * ეს კომპონენტი მხოლოდ კითხულობს (§4).
  */
-export function Replay({ phase, round, reducedMotion, onFinish }: ReplayProps) {
+export function Replay({ phase, round, reducedMotion, onFinish, onGoalImpact }: ReplayProps) {
   const [frame, setFrame] = useState<Frame>(IDLE)
   const startedAt = useRef<number | null>(null)
   const netDone = useRef(false)
@@ -75,9 +80,8 @@ export function Replay({ phase, round, reducedMotion, onFinish }: ReplayProps) {
                 ball: plan.rest,
                 spin: 0,
                 keeperProgress: 1,
-                shooterSwing: 1,
+                shooterSwing: 1.6,
                 netImpact: null,
-                // ბოძის ნიშანი შედეგის ეკრანზეც რჩება
                 postFlash: frame.postFlash,
               }
             : IDLE,
@@ -96,7 +100,7 @@ export function Replay({ phase, round, reducedMotion, onFinish }: ReplayProps) {
         ball: plan.rest,
         spin: 0,
         keeperProgress: 1,
-        shooterSwing: 1,
+        shooterSwing: 1.6,
         netImpact: null,
         postFlash:
           plan.result === 'post' && round
@@ -110,20 +114,24 @@ export function Replay({ phase, round, reducedMotion, onFinish }: ReplayProps) {
       return
     }
 
-    const flying = t < plan.tBall
+    // ბურთის დრო დარტყმიდან ითვლება
+    const ballT = t - KICK_AT
+    const flying = ballT >= 0 && ballT < plan.tBall
     const commitAt = round?.keeper.commitAt ?? plan.tBall
-    const netImpact =
-      !netDone.current && plan.result === 'goal' && t >= plan.tBall && round
-        ? {
-            x: round.resolution.landing.x,
-            y: round.resolution.landing.y,
-            at: clock.elapsedTime,
-            strength: 0.34,
-          }
-        : frame.netImpact
-    if (netImpact && netImpact !== frame.netImpact) netDone.current = true
 
-    const hitPost = plan.result === 'post' && t >= plan.tBall && round
+    let netImpact = frame.netImpact
+    if (!netDone.current && plan.result === 'goal' && ballT >= plan.tBall && round) {
+      netImpact = {
+        x: round.resolution.landing.x,
+        y: round.resolution.landing.y,
+        at: clock.elapsedTime,
+        strength: 0.34,
+      }
+      netDone.current = true
+      onGoalImpact?.(clock.elapsedTime)
+    }
+
+    const hitPost = plan.result === 'post' && ballT >= plan.tBall && round
     const postFlash: PostFlash | null =
       frame.postFlash ??
       (hitPost
@@ -131,15 +139,15 @@ export function Replay({ phase, round, reducedMotion, onFinish }: ReplayProps) {
         : null)
 
     setFrame({
-      ball: sampleFlight(plan, t),
+      ball: ballT <= 0 ? BALL_START : sampleFlight(plan, ballT),
       spin: flying ? 26 : 7,
-      keeperProgress: Math.min(1, Math.max(0, (t - commitAt) / DIVE_TIME)),
-      shooterSwing: Math.min(1, t / 0.28),
+      keeperProgress: Math.min(1, Math.max(0, (ballT - commitAt) / DIVE_TIME)),
+      shooterSwing: t / KICK_AT,
       netImpact,
       postFlash,
     })
 
-    if (t >= flightDuration(plan) + HOLD && !ended.current) {
+    if (ballT >= flightDuration(plan) + HOLD && !ended.current) {
       ended.current = true
       onFinish()
     }
@@ -150,11 +158,7 @@ export function Replay({ phase, round, reducedMotion, onFinish }: ReplayProps) {
 
   return (
     <>
-      <Goal
-        impact={frame.netImpact}
-        postFlash={frame.postFlash}
-        reducedMotion={reducedMotion}
-      />
+      <Goal impact={frame.netImpact} postFlash={frame.postFlash} reducedMotion={reducedMotion} />
       <Keeper dive={dive} progress={frame.keeperProgress} idle={phase !== 'animating'} />
       <Ball position={frame.ball} spin={frame.spin} />
       <Shooter swing={frame.shooterSwing} lean={lean} />

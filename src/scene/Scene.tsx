@@ -1,12 +1,15 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { Bloom, EffectComposer, Vignette } from '@react-three/postprocessing'
 import { PALETTE } from '../lib/palette'
 import { GOAL_HALF_WIDTH, GOAL_HEIGHT, PENALTY_SPOT_Z } from '../lib/geometry'
 import type { Vec2 } from '../lib/physics'
 import type { Phase, RoundRecord } from '../game/store'
+import { useQuality } from '../hooks/useQuality'
 import { Lights } from './Lights'
 import { Pitch } from './Pitch'
+import { Stadium } from './Stadium'
 import { AimReticle } from './AimReticle'
 import { Replay } from './Replay'
 
@@ -30,13 +33,14 @@ const CAM_Z = PENALTY_SPOT_Z + 8.5
 /**
  * კამერა დამრტყმელის უკნიდან, ოდნავ აწეული (§8).
  * კადრი ეკრანის პროპორციას ეგუება: ჯერ fov, თუ არ ეყო — უკან წევა.
- * ასე ~380px სიგანეზეც კარი მთლიანად ჩანს და ბურთიც კადრშია.
+ * დამიზნებისას ძალიან მსუბუქი „ხელის" რხევა აქვს; reduced-motion თიშავს.
  */
 function Rig({ focus, reducedMotion }: { focus: number; reducedMotion: boolean }) {
   const { camera, size } = useThree()
   const current = useRef(0)
+  const look = useRef(LOOK_AT.clone())
 
-  useFrame((_, delta) => {
+  useFrame(({ clock }, delta) => {
     const cam = camera as THREE.PerspectiveCamera
     const aspect = size.width / Math.max(1, size.height)
 
@@ -58,8 +62,19 @@ function Rig({ focus, reducedMotion }: { focus: number; reducedMotion: boolean }
       : THREE.MathUtils.damp(current.current, focus, 3.4, delta)
     const f = current.current
 
-    cam.position.set(0, CAM_HEIGHT - 0.22 * f, distance - 1.5 * f)
-    cam.lookAt(LOOK_AT)
+    // ხელის დრიფტი — ორი შეუთავსებელი სიხშირე, შესამჩნევი მაგრამ მშვიდი
+    let dx = 0
+    let dy = 0
+    if (!reducedMotion) {
+      const t = clock.elapsedTime
+      const calm = 1 - f * 0.85
+      dx = (Math.sin(t * 0.43) * 0.05 + Math.sin(t * 1.13) * 0.018) * calm
+      dy = (Math.sin(t * 0.61 + 1.7) * 0.035 + Math.sin(t * 1.51) * 0.012) * calm
+    }
+
+    cam.position.set(dx, CAM_HEIGHT - 0.22 * f + dy, distance - 1.5 * f)
+    look.current.set(LOOK_AT.x + dx * 0.6, LOOK_AT.y + dy * 0.6, LOOK_AT.z)
+    cam.lookAt(look.current)
   })
 
   return null
@@ -74,27 +89,46 @@ export function Scene({
   reducedMotion,
   onAnimationEnd,
 }: SceneProps) {
+  const quality = useQuality()
+  const [flareAt, setFlareAt] = useState<number | null>(null)
+
   return (
     <Canvas
       shadows
-      dpr={[1, 2]}
+      dpr={quality === 'high' ? [1, 2] : [1, 1.5]}
       gl={{ antialias: true, powerPreference: 'high-performance' }}
-      camera={{ fov: 46, position: [0, CAM_HEIGHT, CAM_Z], near: 0.1, far: 200 }}
+      camera={{ fov: 46, position: [0, CAM_HEIGHT, CAM_Z], near: 0.1, far: 300 }}
       onCreated={({ gl, scene }) => {
-        gl.setClearColor(PALETTE.night)
-        scene.fog = new THREE.Fog(PALETTE.night, 22, 78)
+        gl.setClearColor('#04080a')
+        gl.shadowMap.type = THREE.PCFSoftShadowMap
+        scene.fog = new THREE.Fog(PALETTE.night, 30, 110)
       }}
     >
       <Rig focus={phase === 'animating' ? 1 : 0} reducedMotion={reducedMotion} />
-      <Lights />
-      <Pitch />
+      <Lights quality={quality} />
+      <Stadium quality={quality} flareAt={flareAt} reducedMotion={reducedMotion} />
+      <Pitch quality={quality} />
       <AimReticle aim={aim} power={aimPower} tone={tone} />
       <Replay
         phase={phase}
         round={round}
         reducedMotion={reducedMotion}
         onFinish={onAnimationEnd}
+        onGoalImpact={setFlareAt}
       />
+
+      {/* პოსტპროცესინგი მხოლოდ მაღალ ხარისხზე — მობილურზე ითიშება */}
+      {quality === 'high' && (
+        <EffectComposer>
+          <Bloom
+            intensity={0.38}
+            luminanceThreshold={0.88}
+            luminanceSmoothing={0.2}
+            mipmapBlur
+          />
+          <Vignette eskil={false} offset={0.24} darkness={0.58} />
+        </EffectComposer>
+      )}
     </Canvas>
   )
 }

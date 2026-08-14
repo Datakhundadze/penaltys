@@ -1,36 +1,53 @@
 import { PALETTE } from '../lib/palette'
 import { PENALTY_SPOT_Z } from '../lib/geometry'
+import type { Quality } from './textures'
 
 /**
  * §8 — ორი ტემპერატურის შუქი.
- * თბილი ნატრიუმი დამრტყმელის მხრიდან, ცივი ჰალოგენი კარის უკნიდან.
+ * თბილი ნატრიუმი ანძებიდან (Stadium-ის კონუსები ამავე წყაროს ყალბი
+ * ვოლუმეტრიკაა), ცივი ჰალოგენი კარის უკნიდან.
  * ამბერი ყოველთვის დამრტყმელია, ცივი ლურჯი ყოველთვის მეკარე.
  */
-export function Lights({ shadows = true }: { shadows?: boolean }) {
+export function Lights({ quality = 'high' }: { quality?: Quality }) {
+  const shadowSize = quality === 'high' ? 2048 : 1024
+
   return (
     <>
-      <ambientLight intensity={0.12} color={PALETTE.floodlight} />
-      <hemisphereLight args={[PALETTE.floodlight, PALETTE.turf, 0.18]} />
+      <ambientLight intensity={0.22} color="#3a5c48" />
+      <hemisphereLight args={['#5c8a80', '#1c3d26', 0.4]} />
 
-      {/* პროჟექტორი — თბილი, დამრტყმელის მხარეს, ჩრდილს აგდებს */}
+      {/* მთავარი ნატრიუმი — მარჯვენა ანძიდან, ჩრდილს აგდებს */}
       <spotLight
-        position={[6, 12, PENALTY_SPOT_Z - 2]}
-        angle={0.72}
+        position={[13.5, 11.5, -20]}
+        angle={0.62}
         penumbra={1}
-        decay={2}
-        intensity={2000}
+        decay={1.8}
+        intensity={1150}
         color={PALETTE.sodium}
-        castShadow={shadows}
-        shadow-mapSize={[1024, 1024]}
-        shadow-camera-near={4}
-        shadow-camera-far={45}
-        shadow-bias={-0.0015}
+        castShadow
+        shadow-mapSize={[shadowSize, shadowSize]}
+        shadow-camera-near={6}
+        shadow-camera-far={60}
+        shadow-bias={-0.0011}
+        shadow-radius={7}
+        target-position={[0, 0, PENALTY_SPOT_Z - 2]}
       />
 
-      {/* მეორე პროჟექტორი მარცხნიდან — სუსტი, ჩრდილს არ აგდებს */}
+      {/* მეორე ნატრიუმი — მარცხენა ანძიდან, ჩრდილის გარეშე */}
       <spotLight
-        position={[-10, 11, PENALTY_SPOT_Z + 3]}
-        angle={0.85}
+        position={[-13.5, 11.5, -20]}
+        angle={0.66}
+        penumbra={1}
+        decay={1.9}
+        intensity={620}
+        color={PALETTE.sodium}
+        target-position={[0, 0, PENALTY_SPOT_Z]}
+      />
+
+      {/* რბილი თბილი შევსება დამრტყმელის მხრიდან */}
+      <spotLight
+        position={[6, 12, PENALTY_SPOT_Z + 8]}
+        angle={0.8}
         penumbra={1}
         decay={2}
         intensity={850}
