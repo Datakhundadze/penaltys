@@ -34,7 +34,7 @@ export function Ball({ position, spin = 0 }: BallProps) {
 
   return (
     <>
-      <mesh ref={mesh} castShadow position={[position.x, position.y, position.z]}>
+      <mesh ref={mesh} position={[position.x, position.y, position.z]}>
         <sphereGeometry args={[BALL_RADIUS, 24, 18]} />
         <meshStandardMaterial
           color={PALETTE.chalk}

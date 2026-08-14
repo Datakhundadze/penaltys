@@ -47,7 +47,7 @@ export function Lights({ shadows = true }: { shadows?: boolean }) {
         color={PALETTE.floodlight}
       />
       {/* ცივი შევსება კარის წინ — მეკარე ლურჯად უნდა იკითხებოდეს */}
-      <pointLight position={[0, 3.4, 5.5]} decay={2} intensity={190} color={PALETTE.floodlight} />
+      <pointLight position={[0, 3.4, 5.5]} decay={2} intensity={95} color={PALETTE.floodlight} />
     </>
   )
 }

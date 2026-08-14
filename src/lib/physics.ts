@@ -350,14 +350,15 @@ export type Difficulty = 'easy' | 'normal' | 'hard'
  * დანარჩენი სტატები სამივე დონეზე ერთნაირია.
  */
 export const KEEPER_PRESETS: Readonly<Record<Difficulty, Stats>> = {
-  easy: mkStats({ reflex: 10, reach: 10 }),
-  normal: mkStats({ reflex: 40, reach: 40 }),
-  hard: mkStats({ reflex: 75, reach: 75 }),
+  easy: makeStats({ reflex: 10, reach: 10 }),
+  normal: makeStats({ reflex: 40, reach: 40 }),
+  hard: makeStats({ reflex: 75, reach: 75 }),
 }
 
-export const DEFAULT_SHOOTER: Stats = mkStats({})
+export const DEFAULT_SHOOTER: Stats = makeStats()
 
-function mkStats(over: Partial<Stats>): Stats {
+/** §3-ის ნაგულისხმევი სტატები, სურვილისამებრ გადაფარვით */
+export function makeStats(over: Partial<Stats> = {}): Stats {
   return {
     power: 20,
     accuracy: 20,

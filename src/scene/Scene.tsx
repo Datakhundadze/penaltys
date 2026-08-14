@@ -2,26 +2,23 @@ import { useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PALETTE } from '../lib/palette'
-import { GOAL_HALF_WIDTH, GOAL_HEIGHT, PENALTY_SPOT_Z, type Vec3 } from '../lib/geometry'
+import { GOAL_HALF_WIDTH, GOAL_HEIGHT, PENALTY_SPOT_Z } from '../lib/geometry'
 import type { Vec2 } from '../lib/physics'
+import type { Phase, RoundRecord } from '../game/store'
 import { Lights } from './Lights'
 import { Pitch } from './Pitch'
-import { Goal, type NetImpact } from './Goal'
-import { Ball } from './Ball'
-import { Shooter } from './Shooter'
-import { Keeper } from './Keeper'
+import { AimReticle } from './AimReticle'
+import { Replay } from './Replay'
 
 export interface SceneProps {
-  ballPosition: Vec3
-  ballSpin: number
-  shooterSwing: number
-  shooterLean: number
-  keeperDive: Vec2
-  keeperProgress: number
-  netImpact: NetImpact | null
-  /** 0 — მოსვენება, 1 — ბურთი ფრენაშია (კამერა ოდნავ იწევს) */
-  focus: number
+  phase: Phase
+  round: RoundRecord | null
+  /** მიმდინარე დამიზნება — რეტიკულისთვის */
+  aim: Vec2 | null
+  aimPower: number
+  tone: 'sodium' | 'floodlight'
   reducedMotion: boolean
+  onAnimationEnd: () => void
 }
 
 const LOOK_AT = new THREE.Vector3(0, GOAL_HEIGHT * 0.53, 3.5)
@@ -55,7 +52,7 @@ function Rig({ focus, reducedMotion }: { focus: number; reducedMotion: boolean }
     const tanH = Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2) * aspect
     const distance = Math.max(CAM_Z, FRAME_HALF_WIDTH / tanH)
 
-    // §8 — 0.9წმ სანელებელი ბურთის ფრენაზე; reduced-motion-ზე მყისიერი
+    // §8 — სანელებელი ბურთის ფრენაზე; reduced-motion-ზე მყისიერი
     current.current = reducedMotion
       ? focus
       : THREE.MathUtils.damp(current.current, focus, 3.4, delta)
@@ -68,7 +65,15 @@ function Rig({ focus, reducedMotion }: { focus: number; reducedMotion: boolean }
   return null
 }
 
-export function Scene(props: SceneProps) {
+export function Scene({
+  phase,
+  round,
+  aim,
+  aimPower,
+  tone,
+  reducedMotion,
+  onAnimationEnd,
+}: SceneProps) {
   return (
     <Canvas
       shadows
@@ -80,13 +85,16 @@ export function Scene(props: SceneProps) {
         scene.fog = new THREE.Fog(PALETTE.night, 22, 78)
       }}
     >
-      <Rig focus={props.focus} reducedMotion={props.reducedMotion} />
+      <Rig focus={phase === 'animating' ? 1 : 0} reducedMotion={reducedMotion} />
       <Lights />
       <Pitch />
-      <Goal impact={props.netImpact} reducedMotion={props.reducedMotion} />
-      <Keeper dive={props.keeperDive} progress={props.keeperProgress} />
-      <Ball position={props.ballPosition} spin={props.ballSpin} />
-      <Shooter swing={props.shooterSwing} lean={props.shooterLean} />
+      <AimReticle aim={aim} power={aimPower} tone={tone} />
+      <Replay
+        phase={phase}
+        round={round}
+        reducedMotion={reducedMotion}
+        onFinish={onAnimationEnd}
+      />
     </Canvas>
   )
 }
