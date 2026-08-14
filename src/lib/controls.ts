@@ -9,10 +9,14 @@
 
 import { clamp, type Vec2 } from './physics'
 
-/** დამიზნების რადიუსი ეკრანის მოკლე გვერდის წილად */
-export const AIM_RADIUS_FRACTION = 0.3
+/** სიმაღლის სრული დიაპაზონი — ამხელა ვერტიკალური მოსმა = ზედა კუთხე */
+export const FLICK_HEIGHT_FRACTION = 0.26
+/** გვერდითი კუთხის გამძაფრება: 48°-ზე მეტად გადახრილი flick ბოძს აღწევს */
+export const FLICK_ANGLE_GAIN = 1.35
 /** ამაზე მოკლე მოსმა დარტყმად არ ჩაითვლება */
 export const MIN_DRAG_FRACTION = 0.045
+/** ამაზე გრძელი დაჭერა უქმდება — ჟესტი ბალისტიკურია, არა გადაადგილება */
+export const FLICK_TIMEOUT_MS = 700
 
 export interface Viewport {
   readonly width: number
@@ -44,18 +48,28 @@ function shortSide(v: Viewport): number {
 }
 
 /**
- * მოსმის მიმართულება → დამიზნება ნორმალიზებულ კარის კოორდინატებში.
- * `dy` დადებითია ქვევით (ეკრანის კოორდინატები), ზევით მოსმა = კარში მაღლა.
+ * Flick → დამიზნება. ჟესტი თვითონ არის დარტყმა:
+ *
+ * - გვერდითი კუთხე → x: ბრტყელი გვერდითი flick დაბალი, მიწისძირა
+ *   დარტყმაა იმ მხარეს — სიგრძეს მნიშვნელობა არ აქვს, მხოლოდ კუთხეს.
+ * - სიგრძე/ციცაბოობა → y: გრძელი ზევითა flick ზედა კუთხეში ადის.
+ *
+ * ასისტენტობა და დაგლუვება არ არსებობს — 1:1, სწავლადი და თანმიმდევრული.
+ * `dy` დადებითია ქვევით (ეკრანის კოორდინატები).
  */
 export function mapSwipe(dx: number, dy: number, viewport: Viewport): Swipe {
   const s = shortSide(viewport)
-  const aimR = s * AIM_RADIUS_FRACTION
   const length = Math.sqrt(dx * dx + dy * dy)
+  if (length < 1e-6) {
+    return { aim: { x: 0, y: 0 }, power: 0, valid: false }
+  }
 
   return {
     aim: {
-      x: clamp(dx / aimR, -1, 1),
-      y: Math.max(0, Math.min(1, -dy / aimR)),
+      // მიმართულების კუთხე, არა გადაადგილება — მოკლე ბრტყელი flick-იც ბოძთან მიდის
+      x: clamp((dx / length) * FLICK_ANGLE_GAIN, -1, 1),
+      // ვერტიკალური გადაადგილება — რამდენად „წაიღო" ზევით
+      y: Math.max(0, Math.min(1, -dy / (s * FLICK_HEIGHT_FRACTION))),
     },
     power: 0,
     valid: length >= s * MIN_DRAG_FRACTION,
@@ -176,11 +190,13 @@ export function analyzeSwipe(points: readonly SwipePoint[], viewport: Viewport):
 }
 
 /**
- * როცა მოთამაშე კარშია, იგივე მოსმა დივის მომენტს წყვეტს.
- * ცუდი ხარისხი = ადრე დაწოლა და §5-ის −0.15 ჯარიმა.
+ * მეკარის flick: სიჩქარე წყვეტს, რამდენად ადრე და მტკიცედ ეშვება.
+ * სწრაფი flick = ადრეული, დაჯერებული დივი — მაგრამ ნაადრევობა §5-ის
+ * −0.15 ჯარიმას იწვევს და CURVE-საც უხსნის გზას. ნაზი მოსმა = ლოდინი.
+ * ეს არჩევანი მთლიანად მოთამაშის ხელშია.
  */
-export function keeperCommitTime(quality: number, tBall: number): number {
-  return tBall * clamp(0.35 + 0.7 * clamp(quality, 0, 1), 0, 1)
+export function keeperCommitFromPower(power: number, tBall: number): number {
+  return tBall * (1 - 0.6 * clamp(power, 0, 1))
 }
 
 /** უკუკავშირის ზღვრები — „სუფთა დარტყმა" და „მერყევი მოსმა" */
