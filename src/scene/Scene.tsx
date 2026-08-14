@@ -4,7 +4,6 @@ import * as THREE from 'three'
 import { Bloom, EffectComposer, Vignette } from '@react-three/postprocessing'
 import { PALETTE } from '../lib/palette'
 import { GOAL_HALF_WIDTH, GOAL_HEIGHT, PENALTY_SPOT_Z } from '../lib/geometry'
-import type { Vec2 } from '../lib/physics'
 import type { Phase, RoundRecord } from '../game/store'
 import { useQuality } from '../hooks/useQuality'
 import { Lights } from './Lights'
@@ -16,9 +15,6 @@ import { Replay } from './Replay'
 export interface SceneProps {
   phase: Phase
   round: RoundRecord | null
-  /** მიმდინარე დამიზნება — რეტიკულისთვის */
-  aim: Vec2 | null
-  aimPower: number
   tone: 'sodium' | 'floodlight'
   reducedMotion: boolean
   onAnimationEnd: () => void
@@ -80,15 +76,7 @@ function Rig({ focus, reducedMotion }: { focus: number; reducedMotion: boolean }
   return null
 }
 
-export function Scene({
-  phase,
-  round,
-  aim,
-  aimPower,
-  tone,
-  reducedMotion,
-  onAnimationEnd,
-}: SceneProps) {
+export function Scene({ phase, round, tone, reducedMotion, onAnimationEnd }: SceneProps) {
   const quality = useQuality()
   const [flareAt, setFlareAt] = useState<number | null>(null)
 
@@ -108,7 +96,7 @@ export function Scene({
       <Lights quality={quality} />
       <Stadium quality={quality} flareAt={flareAt} reducedMotion={reducedMotion} />
       <Pitch quality={quality} />
-      <AimReticle aim={aim} power={aimPower} tone={tone} />
+      <AimReticle phase={phase} tone={tone} />
       <Replay
         phase={phase}
         round={round}

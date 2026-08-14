@@ -1,7 +1,8 @@
-import { forwardRef, useImperativeHandle, useRef } from 'react'
-import type * as THREE from 'three'
+import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react'
+import * as THREE from 'three'
 import { PALETTE } from '../lib/palette'
 import type { Pose } from './pose'
+import { jerseyTexture } from './textures'
 
 /**
  * სტილიზებული დაბალპოლიგონიანი ჰუმანოიდი პრიმიტივებისგან —
@@ -21,6 +22,9 @@ export interface FigureProps {
   /** მაისურის ფერი — §8-ის ორი ტემპერატურიდან ერთ-ერთი */
   kit: string
   gloves?: boolean
+  /** ზურგზე დაწერილი სახელი + ნომერი */
+  name?: string
+  number?: string
 }
 
 // პროპორციები (მ) — პატარა ათლეტური ფიგურა, არა თილისმა
@@ -35,7 +39,10 @@ const LIMB_R = 0.055
 const SKIN = '#c9a184'
 const SHORTS = '#101a16'
 
-export const Figure = forwardRef<FigureHandle, FigureProps>(function Figure({ kit, gloves }, ref) {
+export const Figure = forwardRef<FigureHandle, FigureProps>(function Figure(
+  { kit, gloves, name, number },
+  ref,
+) {
   const root = useRef<THREE.Group>(null)
   const pelvis = useRef<THREE.Group>(null)
   const torso = useRef<THREE.Group>(null)
@@ -134,6 +141,8 @@ export const Figure = forwardRef<FigureHandle, FigureProps>(function Figure({ ki
             <meshStandardMaterial color={kit} roughness={0.7} />
           </mesh>
 
+          {name && <NamePanel kit={kit} name={name} number={number ?? ''} />}
+
           <group ref={head} position={[0, TORSO_LEN + 0.1, 0]}>
             <mesh position={[0, HEAD_R * 0.6, 0]} castShadow>
               <sphereGeometry args={[HEAD_R, 14, 12]} />
@@ -158,3 +167,19 @@ export const Figure = forwardRef<FigureHandle, FigureProps>(function Figure({ ki
     </group>
   )
 })
+
+
+/**
+ * ზურგის პანელი — ტანის უკანა მხარეს (ლოკალური −z) მოხრილი ცილინდრის
+ * ნაჭერი მაისურის ტექსტურით. ცილინდრის გარე მხარე კამერისკენ იყურება,
+ * როცა ფიგურა ზურგშექცევით დგას (დამრტყმელი).
+ */
+function NamePanel({ kit, name, number }: { kit: string; name: string; number: string }) {
+  const map = useMemo(() => jerseyTexture(name, number, kit), [kit, name, number])
+  return (
+    <mesh position={[0, TORSO_LEN / 2 - 0.04, 0]} rotation={[0, Math.PI, 0]}>
+      <cylinderGeometry args={[0.162, 0.168, 0.42, 16, 1, true, -Math.PI / 3.2, (Math.PI / 3.2) * 2]} />
+      <meshStandardMaterial map={map} roughness={0.72} side={THREE.FrontSide} />
+    </mesh>
+  )
+}

@@ -65,3 +65,25 @@ export function clonePose(p: Pose): Pose {
   return JSON.parse(JSON.stringify(p)) as Pose
 }
 
+
+// ─── იზინგი — პოზები წრფივად არ უნდა იგრძნობოდეს ───
+
+/** სწრაფი დასაწყისი, რბილი დაჯდომა */
+export function easeOutCubic(u: number): number {
+  const t = Math.max(0, Math.min(1, u))
+  return 1 - (1 - t) * (1 - t) * (1 - t)
+}
+
+/** მცირე გადავარდნა ბოლოში — მოქნევას ინერცია აქვს */
+export function easeOutBack(u: number): number {
+  const t = Math.max(0, Math.min(1, u))
+  const c1 = 1.70158
+  const c3 = c1 + 1
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
+}
+
+/** ნელი დასაწყისი — დაძაბვა მოქმედებამდე */
+export function easeInCubic(u: number): number {
+  const t = Math.max(0, Math.min(1, u))
+  return t * t * t
+}

@@ -3,8 +3,8 @@ import { useFrame } from '@react-three/fiber'
 import { BALL_START, type Vec3 } from '../lib/geometry'
 import { flightDuration, planFlight, sampleFlight } from '../lib/flight'
 import type { Vec2 } from '../lib/physics'
-import type { Phase } from '../game/store'
-import type { RoundRecord } from '../game/store'
+import type { Phase, RoundRecord } from '../game/store'
+import { frameKind, type FrameKind } from '../game/replayState'
 import { Ball } from './Ball'
 import { Goal, type NetImpact, type PostFlash } from './Goal'
 import { Keeper } from './Keeper'
@@ -23,6 +23,7 @@ interface Frame {
   ball: Vec3
   spin: number
   keeperProgress: number
+  keeperAnticipation: number
   shooterSwing: number
   netImpact: NetImpact | null
   postFlash: PostFlash | null
@@ -32,6 +33,7 @@ const IDLE: Frame = {
   ball: BALL_START,
   spin: 0,
   keeperProgress: 0,
+  keeperAnticipation: 0,
   shooterSwing: 0,
   netImpact: null,
   postFlash: null,
@@ -41,6 +43,8 @@ const IDLE: Frame = {
 const KICK_AT = 0.62
 /** დივის გაშლის ხანგრძლივობა */
 const DIVE_TIME = 0.3
+/** ჩაჯდომის გაღრმავება დივის წინ */
+const ANTICIPATION = 0.22
 /** შეხების შემდეგ რამდენ ხანს ვაჩერებთ კადრს */
 const HOLD = 0.35
 /** reduced-motion: შედეგი მაშინვე ჩანს */
@@ -58,7 +62,7 @@ export function Replay({ phase, round, reducedMotion, onFinish, onGoalImpact }: 
   const startedAt = useRef<number | null>(null)
   const netDone = useRef(false)
   const ended = useRef(false)
-  const idle = useRef(true)
+  const shown = useRef<FrameKind>('idle')
 
   const plan = useMemo(() => (round ? planFlight(round.resolution) : null), [round])
 
@@ -69,17 +73,22 @@ export function Replay({ phase, round, reducedMotion, onFinish, onGoalImpact }: 
   }, [round, phase])
 
   useFrame(({ clock }) => {
-    if (phase !== 'animating' || !plan) {
-      // შედეგის ჩვენებისას ბურთი იქ რჩება, სადაც გაჩერდა
-      const hold = phase === 'between-rounds' && plan
-      if (!idle.current) {
-        idle.current = true
+    const kind = frameKind(phase, plan !== null)
+
+    if (kind !== 'live') {
+      // კადრი ყოველ ფაზურ გადასვლაზე თავიდან დგება — 'hold' მხოლოდ
+      // შედეგის ეკრანზეა, ყველა სხვა ფაზა იდლი პოზას აბრუნებს.
+      // (აქ იყო შეცდომა: ერთჯერადი დროშა 'hold'-ზე ჩერდებოდა და მეორე
+      // რაუნდში მეკარე მიწაზე რჩებოდა.)
+      if (shown.current !== kind) {
+        shown.current = kind
         setFrame(
-          hold
+          kind === 'hold' && plan
             ? {
                 ball: plan.rest,
                 spin: 0,
-                keeperProgress: 1,
+                keeperProgress: 2,
+                keeperAnticipation: 0,
                 shooterSwing: 1.6,
                 netImpact: null,
                 postFlash: frame.postFlash,
@@ -89,7 +98,8 @@ export function Replay({ phase, round, reducedMotion, onFinish, onGoalImpact }: 
       }
       return
     }
-    idle.current = false
+    shown.current = 'live'
+    if (!plan) return
 
     if (startedAt.current === null) startedAt.current = clock.elapsedTime
     const t = clock.elapsedTime - startedAt.current
@@ -99,7 +109,8 @@ export function Replay({ phase, round, reducedMotion, onFinish, onGoalImpact }: 
       setFrame({
         ball: plan.rest,
         spin: 0,
-        keeperProgress: 1,
+        keeperProgress: 2,
+        keeperAnticipation: 0,
         shooterSwing: 1.6,
         netImpact: null,
         postFlash:
@@ -141,7 +152,12 @@ export function Replay({ phase, round, reducedMotion, onFinish, onGoalImpact }: 
     setFrame({
       ball: ballT <= 0 ? BALL_START : sampleFlight(plan, ballT),
       spin: flying ? 26 : 7,
-      keeperProgress: Math.min(1, Math.max(0, (ballT - commitAt) / DIVE_TIME)),
+      // >1 დაშვების ფაზაა — Keeper თვითონ კეტავს
+      keeperProgress: Math.max(0, (ballT - commitAt) / DIVE_TIME),
+      keeperAnticipation: Math.max(
+        0,
+        Math.min(1, (ballT - (commitAt - ANTICIPATION)) / ANTICIPATION),
+      ),
       shooterSwing: t / KICK_AT,
       netImpact,
       postFlash,
@@ -159,7 +175,13 @@ export function Replay({ phase, round, reducedMotion, onFinish, onGoalImpact }: 
   return (
     <>
       <Goal impact={frame.netImpact} postFlash={frame.postFlash} reducedMotion={reducedMotion} />
-      <Keeper dive={dive} progress={frame.keeperProgress} idle={phase !== 'animating'} />
+      <Keeper
+        dive={dive}
+        progress={frame.keeperProgress}
+        idle={phase !== 'animating'}
+        anticipation={frame.keeperAnticipation}
+        outcome={round?.resolution.result ?? null}
+      />
       <Ball position={frame.ball} spin={frame.spin} />
       <Shooter swing={frame.shooterSwing} lean={lean} />
     </>

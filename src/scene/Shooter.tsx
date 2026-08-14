@@ -4,7 +4,8 @@ import type * as THREE from 'three'
 import { PALETTE } from '../lib/palette'
 import { PENALTY_SPOT_Z } from '../lib/geometry'
 import { Figure, type FigureHandle } from './Figure'
-import { NEUTRAL, clonePose, lerpPose, type Pose } from './pose'
+import { PLAYER_NAME, PLAYER_NUMBER } from '../game/names'
+import { NEUTRAL, clonePose, easeOutBack, easeOutCubic, lerpPose, type Pose } from './pose'
 
 /**
  * დამრტყმელი.
@@ -131,35 +132,47 @@ export function Shooter({
       scratch.root[2] = Math.sin(t * 0.9) * 0.02
       travel = RUNUP_DIST
     } else if (s < 0.55) {
-      // შერბენა: იდლიდან ნაბიჯში, ბურთისკენ მოძრაობით
+      // შერბენა — სამი ნაბიჯი წონის გადატანით
       const u = s / 0.55
       const stride = Math.sin(u * Math.PI * 3)
       lerpPose(IDLE, RUN, Math.min(1, u * 2.4), scratch)
-      // ნაბიჯების მონაცვლეობა — ფეხები საპირისპიროდ ქანაობს
+      // ფეხები საპირისპიროდ ქანაობს, მუხლი მოქნეულ ფეხზე იკეცება
       scratch.hipL[0] = (scratch.hipL[0] ?? 0) * stride
       scratch.hipR[0] = -(scratch.hipR[0] ?? 0) * stride
       scratch.kneeL = 0.35 + Math.max(0, stride) * 0.7
       scratch.kneeR = 0.35 + Math.max(0, -stride) * 0.7
+      // მკლავები ფეხების საპირისპიროდ აწონასწორებენ
       scratch.shoulderL[0] = (scratch.shoulderL[0] ?? 0) * stride
       scratch.shoulderR[0] = (scratch.shoulderR[0] ?? 0) * stride
+      // წონის გადატანა: სხეული ნაბიჯის ფეხისკენ ირხევა, მენჯი ბაუნსობს
+      scratch.root[2] = stride * 0.07
+      scratch.pelvisY += -0.03 * Math.abs(stride)
       travel = RUNUP_DIST * (1 - u * u)
     } else if (s < 0.82) {
-      const u = (s - 0.55) / 0.27
+      // საყრდენი ფეხი ბურთის გვერდით ეშვება, სხეული იმუხტება
+      const u = easeOutCubic((s - 0.55) / 0.27)
       lerpPose(RUN, BACKSWING, u, scratch)
+      // მენჯი იხსნება მოქნევისთვის
+      scratch.root[1] = 0.18 * u
       travel = 0
     } else if (s < 1) {
+      // მოქნევა — სწრაფი, თეძოს ბრუნვით
       const u = (s - 0.82) / 0.18
-      // მოქნევა სწრაფია — ease-in
       lerpPose(BACKSWING, STRIKE, u * u, scratch)
+      scratch.root[1] = 0.18 - 0.5 * u * u
       travel = 0
     } else {
+      // ინერცია — გადავარდნით ჯდება და მიზნის კუთხისკენ იხრება
       const u = Math.min(1, (s - 1) / 0.6)
-      lerpPose(STRIKE, FOLLOW, 1 - (1 - u) * (1 - u), scratch)
+      lerpPose(STRIKE, FOLLOW, easeOutBack(u), scratch)
+      scratch.root[1] = -0.32 * u
+      // სხეული იმ კუთხისკენ იხრება, სადაც დაარტყა
+      scratch.torso[2] = (scratch.torso[2] ?? 0) - lean * 0.3 * u
       travel = -0.3 * u
     }
 
     // გახსნა მიზნის მხარეს
-    scratch.root[1] = -lean * 0.28
+    scratch.root[1] = (scratch.root[1] ?? 0) - lean * 0.28
     fig.current.apply(scratch)
     // ჯგუფი Y-ზე 180°-ითაა შებრუნებული — ლოკალური travel z-ში პირდაპირ ჯდება
     g.position.set(position[0], position[1], position[2] + travel)
@@ -167,7 +180,7 @@ export function Shooter({
 
   return (
     <group ref={group} position={position} rotation={[0, Math.PI, 0]}>
-      <Figure ref={fig} kit={color} />
+      <Figure ref={fig} kit={color} name={PLAYER_NAME} number={PLAYER_NUMBER} />
       {/* რბილი კონტაქტური ჩრდილი */}
       <mesh position={[0, 0.014, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={2}>
         <circleGeometry args={[0.4, 18]} />

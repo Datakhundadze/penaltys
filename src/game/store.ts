@@ -7,7 +7,7 @@
  */
 
 import { create } from 'zustand'
-import { keeperCommitTime, timingQuality, type Swipe } from '../lib/controls'
+import { keeperCommitTime, type AnalyzedSwipe } from '../lib/controls'
 import {
   KEEPER_PRESETS,
   ballFlightTime,
@@ -24,13 +24,7 @@ import {
 } from '../lib/physics'
 import { REGULATION_KICKS, seriesStatus, shooterFor, type Kick, type Side } from './series'
 
-export type Phase =
-  | 'aiming'
-  | 'timing'
-  | 'resolving'
-  | 'animating'
-  | 'between-rounds'
-  | 'finished'
+export type Phase = 'aiming' | 'resolving' | 'animating' | 'between-rounds' | 'finished'
 
 export type Screen = 'menu' | 'match'
 
@@ -65,15 +59,14 @@ interface GameState {
   rootSeed: number
   roundIndex: number
   kicks: Kick[]
-  /** მიმდინარე მოსმა — დამიზნება ან დივი, დამოკიდებულია როლზე */
-  aim: Swipe | null
+  /** ბოლო მოსმის ხარისხი — უკუკავშირისთვის („სუფთა დარტყმა!") */
+  lastQuality: number | null
   /** ბოლო გათამაშებული რაუნდი; ანიმაცია მხოლოდ ამას იმეორებს */
   round: RoundRecord | null
 
   startMatch: (difficulty: Difficulty) => void
-  setAim: (aim: Swipe | null) => void
-  commitAim: (aim: Swipe) => void
-  commitTiming: (marker: number) => void
+  /** ერთი მოსმა ატარებს ყველაფერს: aim + power + quality → შედეგი მაშინვე */
+  commitSwipe: (swipe: AnalyzedSwipe) => void
   finishAnimation: () => void
   nextRound: () => void
   backToMenu: () => void
@@ -97,7 +90,7 @@ export const useGame = create<GameState>((set, get) => ({
   rootSeed: 1,
   roundIndex: 0,
   kicks: [],
-  aim: null,
+  lastQuality: null,
   round: null,
 
   startMatch: (difficulty) =>
@@ -108,23 +101,16 @@ export const useGame = create<GameState>((set, get) => ({
       rootSeed: freshSeed(),
       roundIndex: 0,
       kicks: [],
-      aim: null,
+      lastQuality: null,
       round: null,
     }),
 
-  setAim: (aim) => set({ aim }),
-
-  commitAim: (aim) => {
-    if (get().phase !== 'aiming') return
-    set({ aim, phase: 'timing' })
-  },
-
-  commitTiming: (marker) => {
+  commitSwipe: (swipe) => {
     const state = get()
-    if (state.phase !== 'timing' || !state.aim) return
-    set({ phase: 'resolving' })
+    if (state.phase !== 'aiming' || !swipe.valid) return
+    set({ phase: 'resolving', lastQuality: swipe.quality })
 
-    const quality = timingQuality(marker)
+    const quality = swipe.quality
     const index = state.roundIndex
     const seed = roundSeed(state.rootSeed, index)
     const shooterSide = shooterFor(index)
@@ -138,15 +124,15 @@ export const useGame = create<GameState>((set, get) => ({
     if (shooterSide === 'player') {
       shooterStats = PLAYER_STATS
       keeperStats = botStats
-      shooter = { aim: state.aim.aim, power: state.aim.power, timing: quality }
+      shooter = { aim: swipe.aim, power: swipe.power, timing: quality }
       keeper = botKeeperInput(seed, state.difficulty, ballFlightTime(shooterStats.power))
     } else {
       shooterStats = botStats
       keeperStats = PLAYER_STATS
       shooter = botShooterInput(seed)
       const tBall = ballFlightTime(shooterStats.power)
-      // მოთამაშის დივი: მიმართულება მოსმიდან, მომენტი timing ზოლიდან
-      keeper = { dive: state.aim.aim, commitAt: keeperCommitTime(quality, tBall) }
+      // მოთამაშის დივი: მიმართულება მოსმიდან, მომენტი — მოსმის ხარისხიდან
+      keeper = { dive: swipe.aim, commitAt: keeperCommitTime(quality, tBall) }
     }
 
     const resolution = resolveShot({ shooter, keeper }, shooterStats, keeperStats, seed)
@@ -177,10 +163,10 @@ export const useGame = create<GameState>((set, get) => ({
   nextRound: () => {
     const state = get()
     if (state.phase !== 'between-rounds') return
-    set({ phase: 'aiming', roundIndex: state.roundIndex + 1, aim: null, round: null })
+    set({ phase: 'aiming', roundIndex: state.roundIndex + 1, round: null })
   },
 
-  backToMenu: () => set({ screen: 'menu', phase: 'aiming', round: null, aim: null }),
+  backToMenu: () => set({ screen: 'menu', phase: 'aiming', round: null, lastQuality: null }),
 }))
 
 /** მიმდინარე დარტყმის ნომერი ჩვენებისთვის (1-იდან) */
