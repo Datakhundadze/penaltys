@@ -9,14 +9,16 @@ import { useQuality } from '../hooks/useQuality'
 import { Lights } from './Lights'
 import { Pitch } from './Pitch'
 import { Stadium } from './Stadium'
-import { AimReticle } from './AimReticle'
+import { ReleaseFx } from './ReleaseFx'
+import { TutorialGrid } from './TutorialGrid'
 import { Replay } from './Replay'
 
 export interface SceneProps {
   phase: Phase
   round: RoundRecord | null
-  tone: 'sodium' | 'floodlight'
   reducedMotion: boolean
+  /** სასწავლო 3×3 ბადე — სესიის პირველი დარტყმები */
+  showTutorial: boolean
   onAnimationEnd: () => void
 }
 
@@ -68,7 +70,8 @@ function Rig({ focus, reducedMotion }: { focus: number; reducedMotion: boolean }
       dy = (Math.sin(t * 0.61 + 1.7) * 0.035 + Math.sin(t * 1.51) * 0.012) * calm
     }
 
-    cam.position.set(dx, CAM_HEIGHT - 0.22 * f + dy, distance - 1.5 * f)
+    // აშვებაზე კამერა ოდნავ უკან იწევს და იწევა — სუნთქვა, არა ზუმი
+    cam.position.set(dx, CAM_HEIGHT + 0.14 * f + dy, distance + 1.05 * f)
     look.current.set(LOOK_AT.x + dx * 0.6, LOOK_AT.y + dy * 0.6, LOOK_AT.z)
     cam.lookAt(look.current)
   })
@@ -76,7 +79,7 @@ function Rig({ focus, reducedMotion }: { focus: number; reducedMotion: boolean }
   return null
 }
 
-export function Scene({ phase, round, tone, reducedMotion, onAnimationEnd }: SceneProps) {
+export function Scene({ phase, round, reducedMotion, showTutorial, onAnimationEnd }: SceneProps) {
   const quality = useQuality()
   const [flareAt, setFlareAt] = useState<number | null>(null)
 
@@ -96,7 +99,8 @@ export function Scene({ phase, round, tone, reducedMotion, onAnimationEnd }: Sce
       <Lights quality={quality} />
       <Stadium quality={quality} flareAt={flareAt} reducedMotion={reducedMotion} />
       <Pitch quality={quality} />
-      <AimReticle phase={phase} tone={tone} />
+      <TutorialGrid visible={showTutorial && phase === 'aiming'} />
+      <ReleaseFx phase={phase} round={round} />
       <Replay
         phase={phase}
         round={round}

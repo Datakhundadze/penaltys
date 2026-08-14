@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   analyzeSwipe,
-  keeperCommitTime,
+  keeperCommitFromPower,
   mapSwipe,
   releaseSpeed,
   speedToPower,
@@ -34,17 +34,34 @@ function cleanFlick(
   return pts
 }
 
-describe('mapSwipe (aim)', () => {
-  it('sends an upward swipe high and central', () => {
+describe('mapSwipe (flick aim)', () => {
+  it('sends a long upward flick to the top, central', () => {
     const s = mapSwipe(0, -400, desktop)
     expect(s.aim.x).toBeCloseTo(0, 6)
     expect(s.aim.y).toBe(1)
   })
 
-  it('sends a sideways swipe to the matching post, along the ground', () => {
-    expect(mapSwipe(400, 0, desktop).aim.x).toBe(1)
-    expect(mapSwipe(400, 0, desktop).aim.y).toBe(0)
-    expect(mapSwipe(-400, 0, desktop).aim.x).toBe(-1)
+  it('a flat sideways flick is a low ball to that side — length does not matter', () => {
+    // მოკლეც და გრძელიც ერთსა და იმავე ბოძთან მიდის, მიწისძირა
+    for (const len of [60, 400]) {
+      const s = mapSwipe(len, 0, desktop)
+      expect(s.aim.x).toBe(1)
+      expect(s.aim.y).toBe(0)
+    }
+    expect(mapSwipe(-200, 0, desktop).aim.x).toBe(-1)
+  })
+
+  it('a snappy diagonal flick reaches the top corner', () => {
+    // 45° გრძელი flick: კუთხე x-ს ბოძამდე აძლევს, სიგრძე y-ს ზევით სწევს
+    const s = mapSwipe(230, -230, phone)
+    expect(s.aim.x).toBeGreaterThan(0.9)
+    expect(s.aim.y).toBeGreaterThan(0.85)
+  })
+
+  it('x depends only on the angle, not the displacement', () => {
+    const short = mapSwipe(80, -80, desktop)
+    const long = mapSwipe(320, -320, desktop)
+    expect(short.aim.x).toBeCloseTo(long.aim.x, 6)
   })
 
   it('never aims below the ground line', () => {
@@ -147,7 +164,7 @@ describe('analyzeSwipe', () => {
     const pts = cleanFlick(300, 240)
     const s = analyzeSwipe(pts, phone)
     expect(s.valid).toBe(true)
-    expect(s.aim.y).toBeGreaterThan(0.5)
+    expect(s.aim.y).toBeGreaterThan(0.8)
     expect(Math.abs(s.aim.x)).toBeLessThan(0.15)
     expect(s.power).toBeGreaterThan(0.5)
     expect(s.quality).toBeGreaterThan(0.85)
@@ -168,25 +185,28 @@ describe('analyzeSwipe', () => {
   })
 })
 
-describe('keeperCommitTime', () => {
+describe('keeperCommitFromPower', () => {
   const tBall = ballFlightTime(40)
 
-  it('turns bad quality into an early commit and good quality into a late one', () => {
-    expect(isEarlyCommit(keeperCommitTime(0, tBall), tBall)).toBe(true)
-    expect(isEarlyCommit(keeperCommitTime(1, tBall), tBall)).toBe(false)
+  it('a fast committed flick dives early (and risks the §5 penalty)', () => {
+    expect(isEarlyCommit(keeperCommitFromPower(1, tBall), tBall)).toBe(true)
+  })
+
+  it('a gentle flick waits for the ball', () => {
+    expect(isEarlyCommit(keeperCommitFromPower(0.2, tBall), tBall)).toBe(false)
   })
 
   it('never commits after the ball has arrived', () => {
-    for (const q of [0, 0.25, 0.5, 0.75, 1]) {
-      expect(keeperCommitTime(q, tBall)).toBeLessThanOrEqual(tBall)
+    for (const p of [0, 0.25, 0.5, 0.75, 1]) {
+      expect(keeperCommitFromPower(p, tBall)).toBeLessThanOrEqual(tBall)
     }
   })
 
-  it('is monotonic in quality', () => {
-    expect(keeperCommitTime(0.2, tBall)).toBeLessThan(keeperCommitTime(0.8, tBall))
+  it('is monotonic: more speed, earlier dive', () => {
+    expect(keeperCommitFromPower(0.9, tBall)).toBeLessThan(keeperCommitFromPower(0.3, tBall))
   })
 
-  it('leaves a middling swipe safely past the penalty threshold', () => {
-    expect(keeperCommitTime(0.5, tBall)).toBeGreaterThan(tBall - EARLY_COMMIT_MARGIN)
+  it('leaves a moderate flick past the penalty threshold', () => {
+    expect(keeperCommitFromPower(0.4, tBall)).toBeGreaterThan(tBall - EARLY_COMMIT_MARGIN)
   })
 })

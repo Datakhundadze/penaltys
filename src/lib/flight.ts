@@ -41,8 +41,8 @@ export function planFlight(res: ShotResolution): FlightPlan {
     start: BALL_START,
     impact,
     rest: restingPoint(res.result, impact, side),
-    // დაბალი დარტყმა ბრტყელია, მაღალი — უფრო რკალიანი
-    arc: 0.28 + 0.5 * Math.max(0, res.landing.y),
+    // დაბალი დარტყმა მიწისძირა და ბრტყელია, მაღალი — რკალით ადის
+    arc: 0.05 + 0.6 * Math.pow(Math.max(0, res.landing.y), 1.4),
     tBall: res.tBall,
     tail: TAIL[res.result],
     result: res.result,

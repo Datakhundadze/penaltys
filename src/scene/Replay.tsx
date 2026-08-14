@@ -181,6 +181,12 @@ export function Replay({ phase, round, reducedMotion, onFinish, onGoalImpact }: 
         idle={phase !== 'animating'}
         anticipation={frame.keeperAnticipation}
         outcome={round?.resolution.result ?? null}
+        nearMiss={
+          round !== null &&
+          round.resolution.result === 'goal' &&
+          round.resolution.detail.distance > 0 &&
+          round.resolution.detail.distance < round.resolution.detail.reach * 1.35
+        }
       />
       <Ball position={frame.ball} spin={frame.spin} />
       <Shooter swing={frame.shooterSwing} lean={lean} />

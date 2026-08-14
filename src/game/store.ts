@@ -7,7 +7,7 @@
  */
 
 import { create } from 'zustand'
-import { keeperCommitTime, type AnalyzedSwipe } from '../lib/controls'
+import { keeperCommitFromPower, type AnalyzedSwipe } from '../lib/controls'
 import {
   KEEPER_PRESETS,
   ballFlightTime,
@@ -61,6 +61,8 @@ interface GameState {
   kicks: Kick[]
   /** ბოლო მოსმის ხარისხი — უკუკავშირისთვის („სუფთა დარტყმა!") */
   lastQuality: number | null
+  /** სესიაში ნასროლი პირველი დარტყმები — სასწავლო ბადე 3-ის შემდეგ ქრება */
+  tutorialShots: number
   /** ბოლო გათამაშებული რაუნდი; ანიმაცია მხოლოდ ამას იმეორებს */
   round: RoundRecord | null
 
@@ -70,6 +72,25 @@ interface GameState {
   finishAnimation: () => void
   nextRound: () => void
   backToMenu: () => void
+}
+
+const TUTORIAL_KEY = 'spot-tutorial-shots'
+export const TUTORIAL_SHOTS = 3
+
+function loadTutorialShots(): number {
+  try {
+    return Math.max(0, Number(globalThis.localStorage?.getItem(TUTORIAL_KEY)) || 0)
+  } catch {
+    return 0
+  }
+}
+
+function saveTutorialShots(n: number): void {
+  try {
+    globalThis.localStorage?.setItem(TUTORIAL_KEY, String(n))
+  } catch {
+    /* private mode და მსგავსები — ბადე უბრალოდ ისევ გამოჩნდება */
+  }
 }
 
 /** მოთამაშე ურტყამს ლუწ დარტყმებზე */
@@ -91,6 +112,7 @@ export const useGame = create<GameState>((set, get) => ({
   roundIndex: 0,
   kicks: [],
   lastQuality: null,
+  tutorialShots: loadTutorialShots(),
   round: null,
 
   startMatch: (difficulty) =>
@@ -131,14 +153,22 @@ export const useGame = create<GameState>((set, get) => ({
       keeperStats = PLAYER_STATS
       shooter = botShooterInput(seed)
       const tBall = ballFlightTime(shooterStats.power)
-      // მოთამაშის დივი: მიმართულება მოსმიდან, მომენტი — მოსმის ხარისხიდან
-      keeper = { dive: swipe.aim, commitAt: keeperCommitTime(quality, tBall) }
+      // მოთამაშის დივი: მიმართულება flick-იდან, სისწრაფე — რამდენად ადრე ეშვება
+      keeper = { dive: swipe.aim, commitAt: keeperCommitFromPower(swipe.power, tBall) }
     }
 
     const resolution = resolveShot({ shooter, keeper }, shooterStats, keeperStats, seed)
 
+    // სასწავლო ბადე მხოლოდ მოთამაშის პირველ დარტყმებს ითვლის
+    let tutorialShots = state.tutorialShots
+    if (shooterSide === 'player' && tutorialShots < TUTORIAL_SHOTS) {
+      tutorialShots++
+      saveTutorialShots(tutorialShots)
+    }
+
     set({
       phase: 'animating',
+      tutorialShots,
       round: { index, shooterSide, shooter, keeper, resolution },
     })
   },

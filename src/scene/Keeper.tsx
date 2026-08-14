@@ -37,6 +37,8 @@ export interface KeeperProps {
   anticipation?: number
   /** რაუნდის შედეგი — დაშვების პოზას არჩევს (აღება/მოგერიება) */
   outcome?: ShotResult | null
+  /** გოლი ძლივს ასცდა ხელს — თითის წვერებზე გაჭიმული რჩება */
+  nearMiss?: boolean
 }
 
 // ─── პოზები ─────────────────────────────────────────────────
@@ -161,6 +163,7 @@ export function Keeper({
   color = PALETTE.floodlight,
   anticipation = 0,
   outcome = null,
+  nearMiss = false,
 }: KeeperProps) {
   const group = useRef<THREE.Group>(null)
   const fig = useRef<FigureHandle>(null)
@@ -218,7 +221,15 @@ export function Keeper({
     if (land > 0) {
       // დაშვება: დაბალზე გადაგორება, მაღალზეც ჩამოშვება; შედეგი პოზას არჩევს
       const settle =
-        outcome === 'save' ? HOLD_BALL : outcome === 'rebound' ? PARRY : low ? LOW_LAND : PARRY
+        outcome === 'save'
+          ? HOLD_BALL
+          : outcome === 'rebound'
+            ? PARRY
+            : outcome === 'goal' && nearMiss
+              ? STRETCH // თითის წვერებზე — ძლივს ვერ მისწვდა
+              : low
+                ? LOW_LAND
+                : PARRY
       lerpPose(scratch, settle, land, scratch2)
       pose = scratch2
     }

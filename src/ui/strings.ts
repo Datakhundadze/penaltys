@@ -10,8 +10,9 @@ export const T = {
   bot: 'ბოტი',
   shootTurn: 'შენი დარტყმაა',
   keepTurn: 'შენი დაცვაა',
-  aimHintShoot: 'ერთი მოსმით დაარტყი — მიმართულება ამიზნებს, სისწრაფე ძალაა, სისუფთავე კი სიზუსტე',
-  aimHintKeep: 'ერთი მოსმით გადაეშვი იქით, საითაც ბურთს ელოდები',
+  aimHintShoot: 'აუსვი სწრაფად — flick თვითონ არის დარტყმა',
+  aimHintKeep: 'სწრაფი flick ზონისკენ — ადრე გადაეშვები; ნაზი — დაიცდი',
+  tutorialHint: 'აუსვი სწრაფად — მიმართულება და სიმაღლე შენს ჟესტშია',
   cleanStrike: 'სუფთა დარტყმა!',
   shakySwipe: 'მერყევი მოსმა',
   next: 'შემდეგი',
@@ -39,7 +40,7 @@ export const DIFFICULTY_NOTE: Record<Difficulty, string> = {
 export const RESULT_LABEL: Record<ShotResult, string> = {
   goal: 'გოლი',
   save: 'აღება',
-  post: 'ბოძი',
+  post: 'ძელი',
   out: 'აუტი',
   rebound: 'მოგერიება',
 }

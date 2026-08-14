@@ -1,5 +1,5 @@
 import { useReducedMotion } from './hooks/useReducedMotion'
-import { playerRole, useGame } from './game/store'
+import { TUTORIAL_SHOTS, playerRole, useGame } from './game/store'
 import { Scene } from './scene/Scene'
 import { AimSurface } from './ui/AimSurface'
 import { Finished } from './ui/Finished'
@@ -22,6 +22,7 @@ export default function App() {
   const startMatch = useGame((s) => s.startMatch)
   const commitSwipe = useGame((s) => s.commitSwipe)
   const lastQuality = useGame((s) => s.lastQuality)
+  const tutorialShots = useGame((s) => s.tutorialShots)
   const finishAnimation = useGame((s) => s.finishAnimation)
   const nextRound = useGame((s) => s.nextRound)
   const backToMenu = useGame((s) => s.backToMenu)
@@ -35,6 +36,7 @@ export default function App() {
   const inMatch = screen === 'match'
   // §8 — ერთი ორკესტრირებული მომენტი: ბურთის ფრენისას chrome ჩუმდება.
   // გოლზე ხმა მაშინვე ბრუნდება, გაშვებაზე სიჩუმე ცოტა ხანს რჩება.
+  const showTutorial = role === 'shooter' && tutorialShots < TUTORIAL_SHOTS
   const muted =
     phase === 'animating' ||
     phase === 'resolving' ||
@@ -49,8 +51,8 @@ export default function App() {
       <Scene
         phase={phase}
         round={round}
-        tone={tone}
         reducedMotion={reducedMotion}
+        showTutorial={inMatch && showTutorial}
         onAnimationEnd={finishAnimation}
       />
 
@@ -72,7 +74,13 @@ export default function App() {
             <AimSurface
               onCommit={commitSwipe}
               tone={tone}
-              hint={role === 'shooter' ? T.aimHintShoot : T.aimHintKeep}
+              hint={
+                role === 'shooter'
+                  ? showTutorial
+                    ? T.tutorialHint
+                    : T.aimHintShoot
+                  : T.aimHintKeep
+              }
             />
           )}
 
