@@ -6,7 +6,7 @@ import type { Vec2 } from '../lib/physics'
 import type { Phase } from '../game/store'
 import type { RoundRecord } from '../game/store'
 import { Ball } from './Ball'
-import { Goal, type NetImpact } from './Goal'
+import { Goal, type NetImpact, type PostFlash } from './Goal'
 import { Keeper } from './Keeper'
 import { Shooter } from './Shooter'
 
@@ -23,6 +23,7 @@ interface Frame {
   keeperProgress: number
   shooterSwing: number
   netImpact: NetImpact | null
+  postFlash: PostFlash | null
 }
 
 const IDLE: Frame = {
@@ -31,6 +32,7 @@ const IDLE: Frame = {
   keeperProgress: 0,
   shooterSwing: 0,
   netImpact: null,
+  postFlash: null,
 }
 
 /** დივის გაშლის ხანგრძლივობა */
@@ -69,7 +71,15 @@ export function Replay({ phase, round, reducedMotion, onFinish }: ReplayProps) {
         idle.current = true
         setFrame(
           hold
-            ? { ball: plan.rest, spin: 0, keeperProgress: 1, shooterSwing: 1, netImpact: null }
+            ? {
+                ball: plan.rest,
+                spin: 0,
+                keeperProgress: 1,
+                shooterSwing: 1,
+                netImpact: null,
+                // ბოძის ნიშანი შედეგის ეკრანზეც რჩება
+                postFlash: frame.postFlash,
+              }
             : IDLE,
         )
       }
@@ -88,6 +98,10 @@ export function Replay({ phase, round, reducedMotion, onFinish }: ReplayProps) {
         keeperProgress: 1,
         shooterSwing: 1,
         netImpact: null,
+        postFlash:
+          plan.result === 'post' && round
+            ? { side: round.resolution.detail.postSide === -1 ? -1 : 1, at: clock.elapsedTime }
+            : null,
       })
       if (t >= REDUCED_HOLD && !ended.current) {
         ended.current = true
@@ -109,12 +123,20 @@ export function Replay({ phase, round, reducedMotion, onFinish }: ReplayProps) {
         : frame.netImpact
     if (netImpact && netImpact !== frame.netImpact) netDone.current = true
 
+    const hitPost = plan.result === 'post' && t >= plan.tBall && round
+    const postFlash: PostFlash | null =
+      frame.postFlash ??
+      (hitPost
+        ? { side: round.resolution.detail.postSide === -1 ? -1 : 1, at: clock.elapsedTime }
+        : null)
+
     setFrame({
       ball: sampleFlight(plan, t),
       spin: flying ? 26 : 7,
       keeperProgress: Math.min(1, Math.max(0, (t - commitAt) / DIVE_TIME)),
       shooterSwing: Math.min(1, t / 0.28),
       netImpact,
+      postFlash,
     })
 
     if (t >= flightDuration(plan) + HOLD && !ended.current) {
@@ -128,7 +150,11 @@ export function Replay({ phase, round, reducedMotion, onFinish }: ReplayProps) {
 
   return (
     <>
-      <Goal impact={frame.netImpact} reducedMotion={reducedMotion} />
+      <Goal
+        impact={frame.netImpact}
+        postFlash={frame.postFlash}
+        reducedMotion={reducedMotion}
+      />
       <Keeper dive={dive} progress={frame.keeperProgress} idle={phase !== 'animating'} />
       <Ball position={frame.ball} spin={frame.spin} />
       <Shooter swing={frame.shooterSwing} lean={lean} />

@@ -1,32 +1,52 @@
-# React + TypeScript + Vite
+# SPOT — ფაზა 0
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+პენალტების პროტოტიპი ერთ გვერდზე: ბოტი მეკარე, ქსელის, ავტორიზაციისა და
+ბაზის გარეშე. სპეციფიკაცია — [`SPEC.md`](./SPEC.md), ეს ფაზა აღწერილია §9-ში.
 
-Currently, two official plugins are available:
+## გაშვება
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev      # ლოკალური სერვერი
+npm test         # ფიზიკის, კონტროლისა და სერიის ტესტები (vitest)
+npm run build    # tsc -b && vite build → dist/
+npm run lint
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Cloudflare Pages: build `npm run build`, output `dist`.
+
+## სტრუქტურა
+
+| გზა | რა არის |
+|---|---|
+| `src/lib/physics.ts` | §5-ის ფორმულები. სუფთა ფუნქციები, seed-ზე დამოკიდებული შემთხვევითობა. React-ის, three.js-ისა და ბრაუზერის API-ს გარეშე — ფაზა 2-ში უცვლელად გადადის Deno Edge Function-ში |
+| `src/lib/controls.ts` | მოსმა → დამიზნება/ძალა, timing ზოლი → ხარისხი |
+| `src/lib/flight.ts` | ბურთის ტრაექტორია და ბადის ტალღა — გამოთვლილი შედეგის გათამაშება |
+| `src/lib/geometry.ts` | ნორმალიზებული კარის კოორდინატები ↔ სამყარო |
+| `src/game/` | zustand store და სერიის წესები (5+5, გადამწყვეტი) |
+| `src/scene/` | React Three Fiber სცენა; `Shooter.tsx` / `Keeper.tsx` პლეისჰოლდერებია |
+| `src/ui/` | ქართული HUD, ledger, მენიუ |
+
+## წესები, რომლებიც კოდში მოქმედებს
+
+- **ჯერ გადაწყვეტა, მერე ანიმაცია.** `resolveShot(input, statsShooter, statsKeeper, seed)`
+  სრულ შედეგს აბრუნებს დარტყმამდე; `Replay.tsx` მხოლოდ ათამაშებს მას (§4).
+- **შემთხვევითობა მხოლოდ seed-იდან.** `physics.ts`-ში `Math.random()` არ არსებობს;
+  სერიის ფესვი ერთხელ ისახება store-ში და ყოველი რაუნდის seed მისგან იშლება.
+- **სირთულე მხოლოდ REFLEX/REACH-ს ცვლის.** სხვა სტატები სამივე დონეზე ერთია.
+- **ფიზიკის ძრავა არ გვაქვს.** §5-ის მათემატიკა მთელი სიმულაციაა.
+
+## §5-ის ორი ადგილი, სადაც არჩევანი გავაკეთეთ
+
+1. **`v = 18 + 0.12 × POWER`** — `POWER` აღებულია როგორც *სტატი* (0..100), როგორც
+   `ACC`, `REACH`, `REFLEX`, `HANDS`. ეს ზუსტად იძლევა სპეციფიკაციის დიაპაზონს
+   (≈0.68წმ → ≈0.40წმ). შესაბამისად მოსმის `power ∈ [0,1]` მოქმედებს გაფანტვაზე,
+   არა ფრენის დროზე. თუ ბალანსისთვის სასურველია, რომ მოსმის ძალამაც შეცვალოს
+   სიჩქარე, ეს `ballFlightTime`-ის ერთი ხაზია.
+2. **CURVE** — §5 აღწერს ეფექტს („მეკარის დივი წერტილთან უფრო შორს აღმოჩნდება,
+   თუ ადრე დაიწყო"), მაგრამ ფორმულას არ იძლევა. დანერგილია ერთი დასახელებული
+   მუდმივით `CURVE_DRIFT_MAX = 0.12`, რომელიც მხოლოდ ნაადრევ დივზე მოქმედებს.
+   `0`-ზე დაყენება ეფექტს სრულად თიშავს.
+
+დანარჩენი §5 პირდაპირ ისეა, როგორც წერია — ბოძის ზოლი მხოლოდ `|x|`-ზეა
+განსაზღვრული, ამიტომ ჰორიზონტალზე ცალკე შემოწმება არ დაგვიმატებია.

@@ -3,34 +3,86 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PALETTE } from '../lib/palette'
 import { netRipple } from '../lib/flight'
-import {
-  GOAL_DEPTH,
-  GOAL_HALF_WIDTH,
-  GOAL_HEIGHT,
-  POST_RADIUS,
-} from '../lib/geometry'
+import { GOAL_DEPTH, GOAL_HALF_WIDTH, GOAL_HEIGHT, POST_RADIUS } from '../lib/geometry'
 
 export interface NetImpact {
   /** შეხების წერტილი ნორმალიზებულ კარის კოორდინატებში */
   readonly x: number
   readonly y: number
-  /** performance.now()-ის დროშტამპი (წმ) */
+  /** სცენის საათის დროშტამპი (წმ) */
   readonly at: number
   readonly strength: number
+}
+
+export interface PostFlash {
+  /** −1 მარცხენა ბოძი, 1 მარჯვენა */
+  readonly side: -1 | 1
+  readonly at: number
 }
 
 export interface GoalProps {
   /** ბოლო შეხება ბადეზე — null თუ ტალღა არ გვინდა */
   impact: NetImpact | null
+  /** ბოძში მოხვედრა — §5-ის „ტკბილი მომენტი", აღებისგან განსხვავებული */
+  postFlash: PostFlash | null
   /** prefers-reduced-motion — ტალღა ითიშება, ლოგიკა უცვლელი რჩება */
   reducedMotion?: boolean
 }
 
 const COLS = 22
 const ROWS = 9
+/** ბოძის ციმციმის ხანგრძლივობა (წმ) */
+const FLASH_TIME = 0.75
+
+/** ბოძები და ჰორიზონტალი — ბოძი დარტყმაზე ანთდება */
+function Frame({ flash, reducedMotion }: { flash: PostFlash | null; reducedMotion?: boolean }) {
+  const left = useRef<THREE.MeshStandardMaterial>(null)
+  const right = useRef<THREE.MeshStandardMaterial>(null)
+
+  useFrame(({ clock }) => {
+    for (const [side, ref] of [
+      [-1, left],
+      [1, right],
+    ] as const) {
+      const mat = ref.current
+      if (!mat) continue
+      if (!flash || flash.side !== side) {
+        mat.emissiveIntensity = 0
+        continue
+      }
+      const u = (clock.elapsedTime - flash.at) / FLASH_TIME
+      // ციმციმის შემდეგ ბოძი ჩამქრალი რჩება, სანამ შედეგი ეკრანზეა.
+      // reduced-motion: ერთი სტატიკური ნიშანი, ციმციმის გარეშე.
+      mat.emissiveIntensity = reducedMotion ? 1.2 : 0.55 + Math.max(0, 1 - u) * 2.1
+    }
+  })
+
+  return (
+    <>
+      {([-1, 1] as const).map((s) => (
+        <mesh key={s} position={[s * GOAL_HALF_WIDTH, GOAL_HEIGHT / 2, 0]} castShadow>
+          <cylinderGeometry args={[POST_RADIUS, POST_RADIUS, GOAL_HEIGHT, 14]} />
+          <meshStandardMaterial
+            ref={s === -1 ? left : right}
+            color={PALETTE.chalk}
+            roughness={0.45}
+            metalness={0.05}
+            emissive={PALETTE.card}
+            emissiveIntensity={0}
+          />
+        </mesh>
+      ))}
+
+      <mesh position={[0, GOAL_HEIGHT, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+        <cylinderGeometry args={[POST_RADIUS, POST_RADIUS, GOAL_HALF_WIDTH * 2, 14]} />
+        <meshStandardMaterial color={PALETTE.chalk} roughness={0.45} metalness={0.05} />
+      </mesh>
+    </>
+  )
+}
 
 /** ბადის უკანა პანელი — ერთადერთი, რომელიც ირხევა */
-function BackNet({ impact, reducedMotion }: GoalProps) {
+function BackNet({ impact, reducedMotion }: { impact: NetImpact | null; reducedMotion?: boolean }) {
   const ref = useRef<THREE.LineSegments>(null)
   const disturbed = useRef(false)
 
@@ -127,21 +179,10 @@ function NetShell() {
   )
 }
 
-export function Goal({ impact, reducedMotion }: GoalProps) {
+export function Goal({ impact, postFlash, reducedMotion }: GoalProps) {
   return (
     <group>
-      {[-1, 1].map((s) => (
-        <mesh key={s} position={[s * GOAL_HALF_WIDTH, GOAL_HEIGHT / 2, 0]} castShadow>
-          <cylinderGeometry args={[POST_RADIUS, POST_RADIUS, GOAL_HEIGHT, 14]} />
-          <meshStandardMaterial color={PALETTE.chalk} roughness={0.45} metalness={0.05} />
-        </mesh>
-      ))}
-
-      <mesh position={[0, GOAL_HEIGHT, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-        <cylinderGeometry args={[POST_RADIUS, POST_RADIUS, GOAL_HALF_WIDTH * 2, 14]} />
-        <meshStandardMaterial color={PALETTE.chalk} roughness={0.45} metalness={0.05} />
-      </mesh>
-
+      <Frame flash={postFlash} reducedMotion={reducedMotion} />
       <BackNet impact={impact} reducedMotion={reducedMotion} />
       <NetShell />
     </group>

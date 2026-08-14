@@ -35,8 +35,12 @@ export default function App() {
   // §8 — ამბერი ყოველთვის დამრტყმელია, ცივი ლურჯი ყოველთვის მეკარე
   const tone = role === 'shooter' ? 'sodium' : 'floodlight'
   const inMatch = screen === 'match'
-  // ერთი ორკესტრირებული მომენტი: ბურთის ფრენისას chrome ჩუმდება
-  const muted = phase === 'animating' || phase === 'resolving'
+  // §8 — ერთი ორკესტრირებული მომენტი: ბურთის ფრენისას chrome ჩუმდება.
+  // გოლზე ხმა მაშინვე ბრუნდება, გაშვებაზე სიჩუმე ცოტა ხანს რჩება.
+  const muted =
+    phase === 'animating' ||
+    phase === 'resolving' ||
+    (phase === 'between-rounds' && round?.resolution.result !== 'goal')
 
   return (
     <div

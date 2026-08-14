@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { TIMING_PERFECT_BAND, markerPosition } from '../lib/controls'
 import { PALETTE } from '../lib/palette'
 import { T } from './strings'
@@ -32,12 +32,13 @@ export function TimingBar({ onStop, tone, hint }: TimingBarProps) {
     return () => cancelAnimationFrame(raf)
   }, [])
 
-  const stop = () => {
+  const stop = useCallback(() => {
     if (stopped.current) return
     stopped.current = true
     onStop(markerPosition((performance.now() - start.current) / 1000))
-  }
+  }, [onStop])
 
+  // კლავიატურით — space/enter იგივეს აკეთებს, რასაც შეხება
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === ' ' || e.key === 'Enter') {
@@ -47,8 +48,7 @@ export function TimingBar({ onStop, tone, hint }: TimingBarProps) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [stop])
 
   return (
     <div
