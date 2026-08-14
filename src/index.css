@@ -1,0 +1,72 @@
+@import 'tailwindcss';
+
+/* SPEC.md §8 — პალიტრა */
+@theme {
+  --color-night: #08120e;
+  --color-turf: #12281f;
+  --color-chalk: #e8ede6;
+  --color-sodium: #f2b23e;
+  --color-card: #d8443c;
+  --color-floodlight: #6fa8c7;
+
+  /* §8 — ტიპოგრაფია. Fira GO არ არის Google Fonts-ზე, ამიტომ
+     Noto Sans Georgian არის fallback ორივე როლისთვის. */
+  --font-body: 'Fira GO', 'Noto Sans Georgian', system-ui, sans-serif;
+  --font-display: 'Noto Sans Georgian', 'Fira GO', system-ui, sans-serif;
+  --font-numeric: 'Archivo', ui-monospace, monospace;
+
+  /* §8 — სკალა: 12 / 14 / 16 / 20 / 28 / 48 / 88 */
+  --text-2xs: 0.75rem;
+  --text-xs: 0.875rem;
+  --text-sm: 1rem;
+  --text-base: 1.25rem;
+  --text-lg: 1.75rem;
+  --text-xl: 3rem;
+  --text-2xl: 5.5rem;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--color-night);
+  color: var(--color-chalk);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+/* კონტროლის ზედაპირზე ბრაუზერის ჟესტები არ უნდა ჩაერიოს */
+canvas,
+.no-touch-gestures {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tabular {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+}
+
+.display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
