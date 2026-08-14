@@ -3,8 +3,8 @@ import { useFrame } from '@react-three/fiber'
 import { BALL_START, type Vec3 } from '../lib/geometry'
 import { flightDuration, planFlight, sampleFlight } from '../lib/flight'
 import type { Vec2 } from '../lib/physics'
-import type { Phase } from '../game/store'
-import type { RoundRecord } from '../game/store'
+import type { Phase, RoundRecord } from '../game/store'
+import { frameKind, type FrameKind } from '../game/replayState'
 import { Ball } from './Ball'
 import { Goal, type NetImpact, type PostFlash } from './Goal'
 import { Keeper } from './Keeper'
@@ -58,7 +58,7 @@ export function Replay({ phase, round, reducedMotion, onFinish, onGoalImpact }: 
   const startedAt = useRef<number | null>(null)
   const netDone = useRef(false)
   const ended = useRef(false)
-  const idle = useRef(true)
+  const shown = useRef<FrameKind>('idle')
 
   const plan = useMemo(() => (round ? planFlight(round.resolution) : null), [round])
 
@@ -69,13 +69,17 @@ export function Replay({ phase, round, reducedMotion, onFinish, onGoalImpact }: 
   }, [round, phase])
 
   useFrame(({ clock }) => {
-    if (phase !== 'animating' || !plan) {
-      // შედეგის ჩვენებისას ბურთი იქ რჩება, სადაც გაჩერდა
-      const hold = phase === 'between-rounds' && plan
-      if (!idle.current) {
-        idle.current = true
+    const kind = frameKind(phase, plan !== null)
+
+    if (kind !== 'live') {
+      // კადრი ყოველ ფაზურ გადასვლაზე თავიდან დგება — 'hold' მხოლოდ
+      // შედეგის ეკრანზეა, ყველა სხვა ფაზა იდლი პოზას აბრუნებს.
+      // (აქ იყო შეცდომა: ერთჯერადი დროშა 'hold'-ზე ჩერდებოდა და მეორე
+      // რაუნდში მეკარე მიწაზე რჩებოდა.)
+      if (shown.current !== kind) {
+        shown.current = kind
         setFrame(
-          hold
+          kind === 'hold' && plan
             ? {
                 ball: plan.rest,
                 spin: 0,
@@ -89,7 +93,8 @@ export function Replay({ phase, round, reducedMotion, onFinish, onGoalImpact }: 
       }
       return
     }
-    idle.current = false
+    shown.current = 'live'
+    if (!plan) return
 
     if (startedAt.current === null) startedAt.current = clock.elapsedTime
     const t = clock.elapsedTime - startedAt.current

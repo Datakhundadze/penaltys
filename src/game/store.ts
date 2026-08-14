@@ -65,13 +65,13 @@ interface GameState {
   rootSeed: number
   roundIndex: number
   kicks: Kick[]
-  /** მიმდინარე მოსმა — დამიზნება ან დივი, დამოკიდებულია როლზე */
+  /** დადასტურებული მოსმა — დამიზნება ან დივი, როლის მიხედვით.
+   * ცოცხალი (თითქვეშა) პრევიუ store-ში არ ინახება — იხ. ui/aimPreview. */
   aim: Swipe | null
   /** ბოლო გათამაშებული რაუნდი; ანიმაცია მხოლოდ ამას იმეორებს */
   round: RoundRecord | null
 
   startMatch: (difficulty: Difficulty) => void
-  setAim: (aim: Swipe | null) => void
   commitAim: (aim: Swipe) => void
   commitTiming: (marker: number) => void
   finishAnimation: () => void
@@ -111,8 +111,6 @@ export const useGame = create<GameState>((set, get) => ({
       aim: null,
       round: null,
     }),
-
-  setAim: (aim) => set({ aim }),
 
   commitAim: (aim) => {
     if (get().phase !== 'aiming') return

@@ -1,9 +1,9 @@
-import { useCallback, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { mapSwipe, type Swipe } from '../lib/controls'
 import { PALETTE } from '../lib/palette'
+import { aimPreview } from './aimPreview'
 
 export interface AimSurfaceProps {
-  onPreview: (swipe: Swipe | null) => void
   onCommit: (swipe: Swipe) => void
   /** §8 — ამბერი ურტყამს, ცივი ლურჯი იცავს */
   tone: 'sodium' | 'floodlight'
@@ -12,6 +12,7 @@ export interface AimSurfaceProps {
 
 interface DragState {
   pointerId: number
+  /** ელემენტის ლოკალურ კოორდინატებში */
   originX: number
   originY: number
   x: number
@@ -19,54 +20,88 @@ interface DragState {
 }
 
 /**
- * მოსმის ზედაპირი — მთელი ეკრანი. თაგვიც და შეხებაც ერთი და იმავე
- * Pointer Events-ით მუშაობს, ბრაუზერის ჟესტები გამორთულია.
+ * მოსმის ზედაპირი — მთელი ეკრანი.
+ *
+ * - მხოლოდ Pointer Events + setPointerCapture; თაგვი და შეხება ერთი გზაა
+ * - touch-action: none (CSS კლასი + inline) და preventDefault, რომ
+ *   ბრაუზერმა ჟესტი სქროლად/pull-to-refresh-ად არ წაიღოს
+ * - კოორდინატები ელემენტის getBoundingClientRect-იდან — ბრაუზერის
+ *   ზოლების გამოჩენა/გაქრობა window-ის ზომას ცვლის, ელემენტისას კი სწორად
+ * - ცოცხალი მდგომარეობა aimPreview-შია; რენდერს მხოლოდ SVG სჭირდება
  */
-export function AimSurface({ onPreview, onCommit, tone, hint }: AimSurfaceProps) {
+export function AimSurface({ onCommit, tone, hint }: AimSurfaceProps) {
   const [drag, setDrag] = useState<DragState | null>(null)
   const ref = useRef<HTMLDivElement>(null)
   const color = tone === 'sodium' ? PALETTE.sodium : PALETTE.floodlight
 
-  const swipeFor = useCallback((d: DragState): Swipe => {
-    return mapSwipe(d.x - d.originX, d.y - d.originY, {
-      width: window.innerWidth,
-      height: window.innerHeight,
-    })
+  // მონტაჟისას ძველი (წინა რაუნდის) პრევიუ იშლება
+  useEffect(() => {
+    aimPreview.swipe = null
   }, [])
+
+  const swipeFor = (el: HTMLElement, d: DragState): Swipe => {
+    const rect = el.getBoundingClientRect()
+    return mapSwipe(d.x - d.originX, d.y - d.originY, {
+      width: Math.max(1, rect.width),
+      height: Math.max(1, rect.height),
+    })
+  }
+
+  const local = (el: HTMLElement, e: React.PointerEvent) => {
+    const rect = el.getBoundingClientRect()
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+  }
 
   const onDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (drag) return
-    ref.current?.setPointerCapture(e.pointerId)
-    setDrag({ pointerId: e.pointerId, originX: e.clientX, originY: e.clientY, x: e.clientX, y: e.clientY })
+    e.preventDefault()
+    const el = e.currentTarget
+    el.setPointerCapture(e.pointerId)
+    const p = local(el, e)
+    const next = { pointerId: e.pointerId, originX: p.x, originY: p.y, x: p.x, y: p.y }
+    setDrag(next)
+    aimPreview.swipe = swipeFor(el, next)
   }
 
   const onMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!drag || e.pointerId !== drag.pointerId) return
-    const next = { ...drag, x: e.clientX, y: e.clientY }
+    e.preventDefault()
+    const el = e.currentTarget
+    const p = local(el, e)
+    const next = { ...drag, x: p.x, y: p.y }
     setDrag(next)
-    const swipe = swipeFor(next)
-    onPreview(swipe.valid ? swipe : null)
+    // რეტიკული ამას პირდაპირ კითხულობს — React-ის ციკლს არ ელოდება
+    aimPreview.swipe = swipeFor(el, next)
   }
 
   const onUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!drag || e.pointerId !== drag.pointerId) return
-    const swipe = swipeFor({ ...drag, x: e.clientX, y: e.clientY })
+    e.preventDefault()
+    const el = e.currentTarget
+    const p = local(el, e)
+    const swipe = swipeFor(el, { ...drag, x: p.x, y: p.y })
     setDrag(null)
-    onPreview(null)
-    if (swipe.valid) onCommit(swipe)
+    if (swipe.valid) {
+      // დადასტურებული მიზანი timing ფაზაშიც რჩება გამოსახული
+      aimPreview.swipe = swipe
+      onCommit(swipe)
+    } else {
+      aimPreview.swipe = null
+    }
   }
 
   const onCancel = () => {
     setDrag(null)
-    onPreview(null)
+    aimPreview.swipe = null
   }
 
-  const power = drag ? swipeFor(drag).power : 0
+  const power = drag && ref.current ? swipeFor(ref.current, drag).power : 0
 
   return (
     <div
       ref={ref}
       className="no-touch-gestures absolute inset-0 z-10 cursor-crosshair"
+      style={{ touchAction: 'none' }}
       onPointerDown={onDown}
       onPointerMove={onMove}
       onPointerUp={onUp}

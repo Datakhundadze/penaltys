@@ -16,12 +16,10 @@ export default function App() {
   const phase = useGame((s) => s.phase)
   const kicks = useGame((s) => s.kicks)
   const roundIndex = useGame((s) => s.roundIndex)
-  const aim = useGame((s) => s.aim)
   const round = useGame((s) => s.round)
   const difficulty = useGame((s) => s.difficulty)
 
   const startMatch = useGame((s) => s.startMatch)
-  const setAim = useGame((s) => s.setAim)
   const commitAim = useGame((s) => s.commitAim)
   const commitTiming = useGame((s) => s.commitTiming)
   const finishAnimation = useGame((s) => s.finishAnimation)
@@ -51,8 +49,6 @@ export default function App() {
       <Scene
         phase={phase}
         round={round}
-        aim={inMatch && (phase === 'aiming' || phase === 'timing') ? (aim?.aim ?? null) : null}
-        aimPower={aim?.power ?? 0}
         tone={tone}
         reducedMotion={reducedMotion}
         onAnimationEnd={finishAnimation}
@@ -74,7 +70,6 @@ export default function App() {
 
           {phase === 'aiming' && (
             <AimSurface
-              onPreview={setAim}
               onCommit={commitAim}
               tone={tone}
               hint={role === 'shooter' ? T.aimHintShoot : T.aimHintKeep}
