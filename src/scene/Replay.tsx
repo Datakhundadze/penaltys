@@ -23,6 +23,7 @@ interface Frame {
   ball: Vec3
   spin: number
   keeperProgress: number
+  keeperAnticipation: number
   shooterSwing: number
   netImpact: NetImpact | null
   postFlash: PostFlash | null
@@ -32,6 +33,7 @@ const IDLE: Frame = {
   ball: BALL_START,
   spin: 0,
   keeperProgress: 0,
+  keeperAnticipation: 0,
   shooterSwing: 0,
   netImpact: null,
   postFlash: null,
@@ -41,6 +43,8 @@ const IDLE: Frame = {
 const KICK_AT = 0.62
 /** დივის გაშლის ხანგრძლივობა */
 const DIVE_TIME = 0.3
+/** ჩაჯდომის გაღრმავება დივის წინ */
+const ANTICIPATION = 0.22
 /** შეხების შემდეგ რამდენ ხანს ვაჩერებთ კადრს */
 const HOLD = 0.35
 /** reduced-motion: შედეგი მაშინვე ჩანს */
@@ -83,7 +87,8 @@ export function Replay({ phase, round, reducedMotion, onFinish, onGoalImpact }: 
             ? {
                 ball: plan.rest,
                 spin: 0,
-                keeperProgress: 1,
+                keeperProgress: 2,
+                keeperAnticipation: 0,
                 shooterSwing: 1.6,
                 netImpact: null,
                 postFlash: frame.postFlash,
@@ -104,7 +109,8 @@ export function Replay({ phase, round, reducedMotion, onFinish, onGoalImpact }: 
       setFrame({
         ball: plan.rest,
         spin: 0,
-        keeperProgress: 1,
+        keeperProgress: 2,
+        keeperAnticipation: 0,
         shooterSwing: 1.6,
         netImpact: null,
         postFlash:
@@ -146,7 +152,12 @@ export function Replay({ phase, round, reducedMotion, onFinish, onGoalImpact }: 
     setFrame({
       ball: ballT <= 0 ? BALL_START : sampleFlight(plan, ballT),
       spin: flying ? 26 : 7,
-      keeperProgress: Math.min(1, Math.max(0, (ballT - commitAt) / DIVE_TIME)),
+      // >1 დაშვების ფაზაა — Keeper თვითონ კეტავს
+      keeperProgress: Math.max(0, (ballT - commitAt) / DIVE_TIME),
+      keeperAnticipation: Math.max(
+        0,
+        Math.min(1, (ballT - (commitAt - ANTICIPATION)) / ANTICIPATION),
+      ),
       shooterSwing: t / KICK_AT,
       netImpact,
       postFlash,
@@ -164,7 +175,13 @@ export function Replay({ phase, round, reducedMotion, onFinish, onGoalImpact }: 
   return (
     <>
       <Goal impact={frame.netImpact} postFlash={frame.postFlash} reducedMotion={reducedMotion} />
-      <Keeper dive={dive} progress={frame.keeperProgress} idle={phase !== 'animating'} />
+      <Keeper
+        dive={dive}
+        progress={frame.keeperProgress}
+        idle={phase !== 'animating'}
+        anticipation={frame.keeperAnticipation}
+        outcome={round?.resolution.result ?? null}
+      />
       <Ball position={frame.ball} spin={frame.spin} />
       <Shooter swing={frame.shooterSwing} lean={lean} />
     </>

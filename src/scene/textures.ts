@@ -475,3 +475,62 @@ export function fogBand(): THREE.Texture {
     return texture(el)
   })
 }
+
+/**
+ * მაისურის ზურგი — სახელი რკალზე + ნომერი. Fira GO/Noto Sans Georgian
+ * ქართულ და ლათინურ ასოებს ერთნაირად ფარავს. ერთი ტექსტურა ორივე
+ * ხარისხის დონეზე საკმარისად მკვეთრია.
+ */
+export function jerseyTexture(name: string, num: string, kitColor: string): THREE.Texture {
+  return memo(`jersey:${name}:${num}:${kitColor}`, () => {
+    const W = 512
+    const H = 512
+    const [el, ctx] = canvas(W, H)
+
+    ctx.fillStyle = kitColor
+    ctx.fillRect(0, 0, W, H)
+    // ქსოვილის ძალიან მსუბუქი ტონი, რომ ერთფეროვნად არ ბრწყინავდეს
+    const rng = mulberry32(0x77f2a1)
+    ctx.globalAlpha = 0.05
+    for (let i = 0; i < 900; i++) {
+      ctx.fillStyle = rng() < 0.5 ? '#000000' : '#ffffff'
+      ctx.fillRect(rng() * W, rng() * H, 2, 2)
+    }
+    ctx.globalAlpha = 1
+
+    const text = name.toUpperCase()
+    ctx.fillStyle = PALETTE.chalk
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+
+    // სახელი — ოდნავ რკალზე გამოწყობილი, ასო-ასო
+    const fontSize = Math.min(92, 380 / Math.max(1, text.length * 0.62))
+    ctx.font = `800 ${fontSize}px "Fira GO", "Noto Sans Georgian", system-ui, sans-serif`
+    const arcR = 620
+    const arcY = 168 + arcR
+    const widths = [...text].map((ch) => ctx.measureText(ch).width)
+    const gap = fontSize * 0.08
+    const total = widths.reduce((s, w) => s + w + gap, -gap)
+    let acc = -total / 2
+    for (let i = 0; i < text.length; i++) {
+      const w = widths[i] ?? 0
+      const centre = acc + w / 2
+      const angle = centre / arcR
+      ctx.save()
+      ctx.translate(W / 2 + Math.sin(angle) * arcR, arcY - Math.cos(angle) * arcR)
+      ctx.rotate(angle)
+      ctx.fillText(text[i] ?? '', 0, 0)
+      ctx.restore()
+      acc += w + gap
+    }
+
+    // ნომერი
+    ctx.font = `900 240px "Archivo", "Fira GO", system-ui, sans-serif`
+    ctx.fillText(num, W / 2, 360)
+
+    const t = texture(el, true)
+    t.wrapS = THREE.ClampToEdgeWrapping
+    t.wrapT = THREE.ClampToEdgeWrapping
+    return t
+  })
+}

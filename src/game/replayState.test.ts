@@ -13,7 +13,6 @@ describe('frameKind — ინვარიანტი: რაუნდი ი�
     // animating → between-rounds (დივის პოზა) → aiming (ახალი რაუნდი)
     const sequence: [Phase, boolean][] = [
       ['aiming', false],
-      ['timing', false],
       ['resolving', false],
       ['animating', true],
       ['between-rounds', true],
@@ -26,7 +25,7 @@ describe('frameKind — ინვარიანტი: რაუნდი ი�
   })
 
   it('is idle in every non-animating phase without a plan', () => {
-    for (const phase of ['aiming', 'timing', 'resolving', 'between-rounds', 'finished'] as const) {
+    for (const phase of ['aiming', 'resolving', 'between-rounds', 'finished'] as const) {
       expect(frameKind(phase, false)).toBe('idle')
     }
   })

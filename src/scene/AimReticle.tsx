@@ -27,7 +27,7 @@ export function AimReticle({ phase, tone }: AimReticleProps) {
     const g = group.current
     if (!g) return
 
-    const active = phase === 'aiming' || phase === 'timing'
+    const active = phase === 'aiming'
     if (!active) {
       // ფაზის მიღმა პრევიუც იშლება, რომ შემდეგი რაუნდი ძველს არ აჩენდეს
       aimPreview.swipe = null

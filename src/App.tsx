@@ -5,8 +5,8 @@ import { AimSurface } from './ui/AimSurface'
 import { Finished } from './ui/Finished'
 import { Hud } from './ui/Hud'
 import { Menu } from './ui/Menu'
+import { QualityFlash } from './ui/QualityFlash'
 import { RoundResult } from './ui/RoundResult'
-import { TimingBar } from './ui/TimingBar'
 import { T } from './ui/strings'
 
 export default function App() {
@@ -20,8 +20,8 @@ export default function App() {
   const difficulty = useGame((s) => s.difficulty)
 
   const startMatch = useGame((s) => s.startMatch)
-  const commitAim = useGame((s) => s.commitAim)
-  const commitTiming = useGame((s) => s.commitTiming)
+  const commitSwipe = useGame((s) => s.commitSwipe)
+  const lastQuality = useGame((s) => s.lastQuality)
   const finishAnimation = useGame((s) => s.finishAnimation)
   const nextRound = useGame((s) => s.nextRound)
   const backToMenu = useGame((s) => s.backToMenu)
@@ -61,7 +61,7 @@ export default function App() {
           <p
             className="pointer-events-none absolute inset-x-0 top-24 z-20 text-center text-sm transition-opacity duration-500"
             style={{
-              opacity: phase === 'aiming' || phase === 'timing' ? 0.9 : 0,
+              opacity: phase === 'aiming' ? 0.9 : 0,
               color: tone === 'sodium' ? 'var(--color-sodium)' : 'var(--color-floodlight)',
             }}
           >
@@ -70,19 +70,16 @@ export default function App() {
 
           {phase === 'aiming' && (
             <AimSurface
-              onCommit={commitAim}
+              onCommit={commitSwipe}
               tone={tone}
               hint={role === 'shooter' ? T.aimHintShoot : T.aimHintKeep}
             />
           )}
 
-          {phase === 'timing' && (
-            <TimingBar
-              onStop={commitTiming}
-              tone={tone}
-              hint={role === 'shooter' ? T.timingHintShoot : T.timingHintKeep}
-            />
-          )}
+          <QualityFlash
+            quality={lastQuality}
+            active={phase === 'animating' || phase === 'resolving'}
+          />
 
           {phase === 'between-rounds' && round && (
             <RoundResult
